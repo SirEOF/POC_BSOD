@@ -1,0 +1,2 @@
+test 'lenovo computer manager' on win7 x86 with version 2.6.30.1221
+only on win7 x86 loads .sys
