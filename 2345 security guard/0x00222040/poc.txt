@@ -1,4 +1,4 @@
-// ConsoleApplication1.cpp : ¶¨Òå¿ØÖÆÌ¨Ó¦ÓÃ³ÌĞòµÄÈë¿Úµã¡£
+// ConsoleApplication1.cpp : å®šä¹‰æ§åˆ¶å°åº”ç”¨ç¨‹åºçš„å…¥å£ç‚¹ã€‚
 //
 
 #include "stdafx.h"
@@ -134,20 +134,23 @@ void Hexdump(PUCHAR Data, ULONG Size)
 
 	char szBuff[0x100], szChr[10];
 	RtlZeroMemory(szBuff, sizeof(szBuff));
-
-	for (dp = 1; dp <= Size; dp++) {
+	for (dp = 1; dp <= Size; dp++) 
+	{
 		sprintf(szChr, "%02x ", Data[dp - 1]);
 		strcat(szBuff, szChr);
 
-		if ((dp % 8) == 0) {
+		if ((dp % 8) == 0) 
+		{
 			strcat(szBuff, " ");
 		}
 
-		if ((dp % 16) == 0) {
+		if ((dp % 16) == 0) 
+		{
 			strcat(szBuff, "| ");
 			p = dp;
 
-			for (dp -= 16; dp < p; dp++) {
+			for (dp -= 16; dp < p; dp++) 
+			{
 				sprintf(szChr, "%c", trans[Data[dp]]);
 				strcat(szBuff, szChr);
 			}
@@ -156,13 +159,15 @@ void Hexdump(PUCHAR Data, ULONG Size)
 		}
 	}
 
-	if ((Size % 16) != 0) {
+	if ((Size % 16) != 0) 
+	{
 		p = dp = 16 - (Size % 16);
-
-		for (dp = p; dp > 0; dp--) {
+		for (dp = p; dp > 0; dp--)
+		{
 			strcat(szBuff, "   ");
 
-			if (((dp % 8) == 0) && (p != 8)) {
+			if (((dp % 8) == 0) && (p != 8)) 
+			{
 				strcat(szBuff, " ");
 			}
 		}
@@ -196,19 +201,10 @@ void fuzz(HANDLE deviceHandle,int IOCODE)
 			bufInput[i + 2] = (fuzzData & 0x00ff0000) >> 16;
 			bufInput[i + 3] = (fuzzData & 0xff000000) >> 24;	
 			Hexdump(bufInput, 65535/4);
-			status = DeviceIoControl(deviceHandle,
-				IOCODE,
-				&bufInput,
-				65535,
-				&brutebufOutput,
-				65535,
-				&nbBytes,
-				NULL);
+			status = DeviceIoControl(deviceHandle,IOCODE,&bufInput,65535,&brutebufOutput,65535,&nbBytes,NULL);
 		}
 	}
-
 }
-
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -221,7 +217,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		fuzz(deviceHandle, 0x00222040);
 	}
-
 	return 0;
 }
 
