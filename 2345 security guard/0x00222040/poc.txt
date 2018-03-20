@@ -1,0 +1,228 @@
+// ConsoleApplication1.cpp : 定义控制台应用程序的入口点。
+//
+
+#include "stdafx.h"
+#include <string.h>
+#include <windows.h>
+#include <tchar.h>
+BOOL cont;
+DWORD  status, errorCode;
+DWORD  nbBytes = 0;
+#define N 624
+#define M 397
+#define MATRIX_A 0x9908b0dfUL   /* constant vector a */
+#define UPPER_MASK 0x80000000UL /* most significant w-r bits */
+#define LOWER_MASK 0x7fffffffUL /* least significant r bits */
+HANDLE deviceHandle;
+static unsigned long mt[N]; /* the array for the state vector  */
+static int mti = N + 1; /* mti==N+1 means mt[N] is not initialized */
+size_t randomLength;
+int fuzzData;
+int IOCODE;
+CHAR asciiString10[0x10];
+CHAR asciiString100[0x100];
+CHAR asciiString1000[0x1000];
+
+WCHAR unicodeString10[0x10];
+WCHAR unicodeString100[0x100];
+WCHAR unicodeString1000[0x1000];
+
+DWORD tableDwords[0x100];
+
+DWORD FuzzRandomSize[] = { 0x00000000, 0x0000003f, 0x1, 0x2, 0x20, 0x3f, 0x40, 0x7f, 0x80, 0xff, 0x3ffff, -1, 0x7fffffff };
+
+DWORD FuzzConstants[] = { 0x00000000, 0x00000001, 0x00000004, 0xFFFFFFFF,
+0x00001000, 0xFFFF0000, 0xFFFFFFFE, 0xFFFFFFF0,
+0xFFFFFFFC, 0x70000000, 0x7FFEFFFF, 0x7FFFFFFF,
+0x80000000,
+(DWORD)asciiString10,
+(DWORD)asciiString100,
+(DWORD)asciiString1000,
+(DWORD)unicodeString10,
+(DWORD)unicodeString100,
+(DWORD)unicodeString1000,
+(DWORD)tableDwords };
+
+BYTE  brutebufInput[0x10000];
+BYTE  brutebufOutput[0x10000];
+BYTE  bufInput[0x10000];
+BYTE  bufOutput[0x10000];
+
+DWORD parseHex(char *str) {
+	DWORD value = 0;
+	
+	for (;; ++str) {
+		switch (*str) {
+		case '0': case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8': case '9':
+			value = value << 4 | *str & 0xf;
+			break;
+		case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+		case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+			value = value << 4 | 9 + *str & 0xf;
+			break;
+		default:
+			return value;
+			//printf("%d",value);
+		}
+	}
+}
+void init_genrand(unsigned long s)
+{
+	mt[0] = s & 0xffffffffUL;
+	for (mti = 1; mti<N; mti++) {
+		mt[mti] =
+			(1812433253UL * (mt[mti - 1] ^ (mt[mti - 1] >> 30)) + mti);
+		/* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
+		/* In the previous versions, MSBs of the seed affect   */
+		/* only MSBs of the array mt[].                        */
+		/* 2002/01/09 modified by Makoto Matsumoto             */
+		mt[mti] &= 0xffffffffUL;
+		/* for >32 bit machines */
+	}
+}
+unsigned long genrand_int32(void)
+{
+	unsigned long y;
+	static unsigned long mag01[2] = { 0x0UL, MATRIX_A };
+	/* mag01[x] = x * MATRIX_A  for x=0,1 */
+
+	if (mti >= N) { /* generate N words at one time */
+		int kk;
+
+		if (mti == N + 1)   /* if init_genrand() has not been called, */
+			init_genrand(5489UL); /* a default initial seed is used */
+
+		for (kk = 0; kk<N - M; kk++) {
+			y = (mt[kk] & UPPER_MASK) | (mt[kk + 1] & LOWER_MASK);
+			mt[kk] = mt[kk + M] ^ (y >> 1) ^ mag01[y & 0x1UL];
+		}
+		for (; kk<N - 1; kk++) {
+			y = (mt[kk] & UPPER_MASK) | (mt[kk + 1] & LOWER_MASK);
+			mt[kk] = mt[kk + (M - N)] ^ (y >> 1) ^ mag01[y & 0x1UL];
+		}
+		y = (mt[N - 1] & UPPER_MASK) | (mt[0] & LOWER_MASK);
+		mt[N - 1] = mt[M - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+
+		mti = 0;
+	}
+
+	y = mt[mti++];
+
+	/* Tempering */
+	y ^= (y >> 11);
+	y ^= (y << 7) & 0x9d2c5680UL;
+	y ^= (y << 15) & 0xefc60000UL;
+	y ^= (y >> 18);
+
+	return y;
+}
+unsigned long getrand(unsigned long min, unsigned long max)
+{
+	return (genrand_int32() % (max - min + 1)) + min;
+}
+void Hexdump(PUCHAR Data, ULONG Size)
+{
+
+	unsigned int dp = 0, p = 0;
+	const char trans[] =
+		"................................ !\"#$%&'()*+,-./0123456789"
+		":;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklm"
+		"nopqrstuvwxyz{|}~...................................."
+		"....................................................."
+		"........................................";
+
+	char szBuff[0x100], szChr[10];
+	RtlZeroMemory(szBuff, sizeof(szBuff));
+
+	for (dp = 1; dp <= Size; dp++) {
+		sprintf(szChr, "%02x ", Data[dp - 1]);
+		strcat(szBuff, szChr);
+
+		if ((dp % 8) == 0) {
+			strcat(szBuff, " ");
+		}
+
+		if ((dp % 16) == 0) {
+			strcat(szBuff, "| ");
+			p = dp;
+
+			for (dp -= 16; dp < p; dp++) {
+				sprintf(szChr, "%c", trans[Data[dp]]);
+				strcat(szBuff, szChr);
+			}
+			printf("%s\r\n", szBuff);
+			RtlZeroMemory(szBuff, sizeof(szBuff));
+		}
+	}
+
+	if ((Size % 16) != 0) {
+		p = dp = 16 - (Size % 16);
+
+		for (dp = p; dp > 0; dp--) {
+			strcat(szBuff, "   ");
+
+			if (((dp % 8) == 0) && (p != 8)) {
+				strcat(szBuff, " ");
+			}
+		}
+
+		strcat(szBuff, " | ");
+		for (dp = (Size - (16 - p)); dp < Size; dp++) {
+			sprintf(szChr, "%c", trans[Data[dp]]);
+			strcat(szBuff, szChr);
+		}
+		printf("%s\r\n", szBuff);
+	}
+
+	printf("\r\n");
+}
+void fuzz(HANDLE deviceHandle,int IOCODE)
+{
+	cont = TRUE;
+	for (int i = 0; cont && i<65535/4; i = i + 4)
+	{
+		// Fill the whole buffer with random data...
+		for (int j = 0; cont && j<65535/4; j++)
+		{
+			bufInput[j] = (BYTE)getrand(0x00, 0xff);
+		}
+		for (int j = 0; cont && j<(sizeof(FuzzConstants) / 4); j++)
+		{
+			fuzzData = FuzzConstants[j];
+			// Choose a random element into FuzzConstants
+			bufInput[i] = fuzzData & 0x000000ff;
+			bufInput[i + 1] = (fuzzData & 0x0000ff00) >> 8;
+			bufInput[i + 2] = (fuzzData & 0x00ff0000) >> 16;
+			bufInput[i + 3] = (fuzzData & 0xff000000) >> 24;	
+			Hexdump(bufInput, 65535/4);
+			status = DeviceIoControl(deviceHandle,
+				IOCODE,
+				&bufInput,
+				65535,
+				&brutebufOutput,
+				65535,
+				&nbBytes,
+				NULL);
+		}
+	}
+
+}
+
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	memset(bufInput, 0x00, 0x10000);
+	memset(bufOutput, 0x00, 0x10000);
+	memset(brutebufInput, 0x41, 0x10000);
+	memset(brutebufOutput, 0x41, 0x10000);
+	deviceHandle = CreateFile(L"\\\\.\\2345NetFirewall", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (deviceHandle != INVALID_HANDLE_VALUE)
+	{
+		fuzz(deviceHandle, 0x00222040);
+	}
+
+	return 0;
+}
+
+
